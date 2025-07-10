@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>A Season Spent Loving You</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Great+Vibes&display=swap" rel="stylesheet" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Playfair Display', serif;
+      background: #f9f6f3;
+      color: #111;
+      overflow-x: hidden;
+      transition: background 0.5s, color 0.5s;
+    }
+
+    body.dark-mode {
+      background: #1a1a1d;
+      color: #eaeaea;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: url('https://upload.wikimedia.org/wikipedia/commons/0/0e/Epiphyllum_oxypetalum_%28flower%29.jpg') center/cover no-repeat fixed;
+      opacity: 0.05;
+      pointer-events: none;
+    }
+
+    body.dark-mode::before {
+      background: radial-gradient(circle, rgba(168,69,101,0.2), #1a1a1d);
+      opacity: 0.25;
+    }
+    h1 {
+      font-family: 'Great Vibes', cursive;
+      text-align: center;
+      font-size: 2.5em;
+      margin-top: 20px;
+      color: #a84565;
+    }
+
+    .tagline {
+      text-align: center;
+      font-style: italic;
+      color: #777;
+      margin-bottom: 15px;
+    }
+
+    #progress, #page-selector {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    #story-container {
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      color: #111;
+      border-radius: 8px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+      min-height: 250px;
+      white-space: pre-wrap;
+      transition: background 0.3s, color 0.3s;
+      font-size: 1.15em;
+    }
+
+    body.dark-mode #story-container {
+      background: #2e2e2e;
+      color: #eaeaea;
+    }
+
+    .special-title {
+      font-family: 'Great Vibes', cursive;
+      font-size: 2em;
+      color: #a84565;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    .fade {
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+    }
+
+    .visible {
+      opacity: 1;
+    }
+
+    #controls {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    button, select {
+      margin: 5px;
+      padding: 8px 14px;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 6px;
+      border: none;
+    }
+
+    #now-playing {
+      text-align: center;
+      font-size: 0.95em;
+      margin-top: 15px;
+      color: #555;
+    }
+
+    #playlist {
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    #playlist button {
+      margin: 4px;
+      padding: 6px 10px;
+      background: #eee;
+    }
+
+    body.dark-mode #playlist button {
+      background: #444;
+      color: white;
+    }
+
+    #petals {
+      pointer-events: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .petal {
+      position: absolute;
+      top: -10px;
+      width: 20px;
+      height: 20px;
+      background: url('https://cdn-icons-png.flaticon.com/512/3533/3533864.png') no-repeat center/contain;
+      opacity: 0.6;
+      animation: fall 12s linear infinite;
+    }
+
+    @keyframes fall {
+      to {
+        transform: translateY(110vh) rotate(360deg);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body class="light-mode">
+  <h1>A Season Spent Loving You</h1>
+  <div class="tagline">Letters written when the world was asleep</div>
+
+  <div id="progress"></div>
+  <div id="page-selector">Jump to: <select id="page-select"></select></div>
+
+  <div id="story-container" class="fade">Loading story...</div>
+
+  <div id="controls">
+    <button id="back">← Back</button>
+    <button id="continue">Continue →</button>
+    <button id="font-toggle">Toggle Font</button>
+    <button id="text-size-smaller">A−</button>
+    <button id="text-size-larger">A+</button>
+    <button id="dark-mode-toggle">🌙</button>
+  </div>
+
+  <div id="now-playing">Now Playing: <span id="current-song">None</span></div>
+  <audio id="audio" controls autoplay></audio>
+  <div id="playlist"></div>
+
+  <div id="petals"></div>
+
+  <script>
+    const docUrl = "https://docs.google.com/document/d/e/2PACX-1vQ_V5VvUIuf6dRGgTy2COpFyl7kSGklmN-GesrjYETBiJetLcnFXpNH4u6F0aYbnbnLbRdT1tN_1pwo/pub";
+    const container = document.getElementById("story-container");
+    const pageSelect = document.getElementById("page-select");
+    const next = document.getElementById("continue");
+    const back = document.getElementById("back");
+
+    let pages = [];
+    let currentPage = 0;
+    const specialTitles = {
+      19: "Carpe Diem",
+      43: "Mi cielo",
+      44: "The Thought of You"
+    };
+
+    fetch(docUrl)
+      .then(res => res.text())
+      .then(data => {
+        const html = new DOMParser().parseFromString(data, "text/html");
+        let text = html.body.innerText.replace(/^Published using Google Docs\s*/, "").trim();
+
+        pages = text
+          .split("===PAGE===")
+          .map(p => p.trim())
+          .filter(p => p && !p.toLowerCase().includes("report abuse") && !p.includes("lst-"));
+
+        pages.forEach((_, i) => {
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.textContent = `Page ${i + 1}`;
+          pageSelect.appendChild(opt);
+        });
+
+        const saved = parseInt(localStorage.getItem("lastPage"));
+        currentPage = !isNaN(saved) && saved < pages.length ? saved : 0;
+        showPage();
+      });
+
+    function typeWriter(text, el, speed = 20, cb) {
+      el.innerHTML = "";
+      let i = 0;
+      function write() {
+        if (i < text.length) {
+          el.innerHTML += text.charAt(i++);
+          setTimeout(write, speed);
+        } else if (cb) cb();
+      }
+      write();
+    }
+
+    function showPage() {
+      container.classList.remove("visible");
+      container.innerHTML = "";
+      setTimeout(() => {
+        const title = specialTitles[currentPage];
+        const content = pages[currentPage] || "(Blank)";
+        if (title) {
+          const t = document.createElement("div");
+          t.className = "special-title";
+          container.appendChild(t);
+          typeWriter(title + "\n", t, 30, () => {
+            const c = document.createElement("div");
+            container.appendChild(c);
+            typeWriter(content, c);
+          });
+        } else {
+          typeWriter(content, container);
+        }
+
+        document.getElementById("progress").textContent = `Page ${currentPage + 1} of ${pages.length}`;
+        pageSelect.value = currentPage;
+        back.style.display = currentPage > 0 ? "inline-block" : "none";
+        next.style.display = currentPage < pages.length - 1 ? "inline-block" : "none";
+        localStorage.setItem("lastPage", currentPage);
+        setTimeout(() => container.classList.add("visible"), 100);
+      }, 100);
+    }
+
+    next.onclick = () => { if (currentPage < pages.length - 1) currentPage++; showPage(); };
+    back.onclick = () => { if (currentPage > 0) currentPage--; showPage(); };
+    pageSelect.onchange = () => { currentPage = parseInt(pageSelect.value); showPage(); };
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowRight") next.click();
+      if (e.key === "ArrowLeft") back.click();
+    });
+
+    document.getElementById("font-toggle").onclick = () => {
+      const f = container.style.fontFamily;
+      container.style.fontFamily = f.includes("sans") ? "Georgia, serif" : "Arial, sans-serif";
+    };
+    document.getElementById("text-size-smaller").onclick = () => {
+      const size = parseFloat(getComputedStyle(container).fontSize);
+      container.style.fontSize = Math.max(size - 1, 12) + "px";
+    };
+    document.getElementById("text-size-larger").onclick = () => {
+      const size = parseFloat(getComputedStyle(container).fontSize);
+      container.style.fontSize = (size + 1) + "px";
+    };
+    document.getElementById("dark-mode-toggle").onclick = () => {
+      document.body.classList.toggle("dark-mode");
+      document.body.classList.toggle("light-mode");
+    };
+
+    // 🌸 Floating petals
+    const petals = document.getElementById("petals");
+    for (let i = 0; i < 15; i++) {
+      const petal = document.createElement("div");
+      petal.className = "petal";
+      petal.style.left = `${Math.random() * 100}vw`;
+      petal.style.animationDuration = `${6 + Math.random() * 6}s`;
+      petal.style.opacity = 0.4 + Math.random() * 0.6;
+      petals.appendChild(petal);
+    }
+
+    // 🎵 Music
+    const playlist = [
+      { title: "Just Like Chet", src: "Music/Just_Like_Chet.mp3" },
+      { title: "There Will Never Be Another You", src: "Music/There_Will_Never_Be_Another_You.mp3" },
+      { title: "Merry Go Round of Life", src: "Music/merry_go_round_of_life.mp3" }
+    ];
+
+    const audio = document.getElementById("audio");
+    const now = document.getElementById("current-song");
+    const playlistDiv = document.getElementById("playlist");
+    let track = parseInt(localStorage.getItem("lastTrack")) || 0;
+
+    function loadTrack(i) {
+      audio.src = playlist[i].src;
+      now.textContent = playlist[i].title;
+      localStorage.setItem("lastTrack", i);
+      audio.play().catch(() => {});
+    }
+
+    playlist.forEach((song, i) => {
+      const btn = document.createElement("button");
+      btn.textContent = song.title;
+      btn.onclick = () => { track = i; loadTrack(track); };
+      playlistDiv.appendChild(btn);
+    });
+
+    audio.addEventListener("ended", () => {
+      track = (track + 1) % playlist.length;
+      loadTrack(track);
+    });
+
+    window.addEventListener("load", () => {
+      loadTrack(track);
+    });
+  </script>
+</body>
+</html>
